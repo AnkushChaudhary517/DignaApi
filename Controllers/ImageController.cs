@@ -60,7 +60,7 @@ public class ImageController : ControllerBase
                 Error = new ErrorDetails
                 {
                     Code = "IMAGE_FETCH_ERROR",
-                    Message = "Failed to retrieve images",
+                    Message = $"Failed to retrieve images : {ex.ToString()}",
                     StatusCode = 500
                 }
             });
@@ -349,7 +349,7 @@ public class ImageController : ControllerBase
                 Error = new ErrorDetails
                 {
                     Code = "IMAGE_FETCH_ERROR",
-                    Message = "Failed to retrieve images",
+                    Message = $"Failed to retrieve images : {ex.ToString()}",
                     StatusCode = 500
                 }
             });
