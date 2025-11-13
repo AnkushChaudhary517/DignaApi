@@ -27,8 +27,10 @@ public class ProfileService : IProfileService
     {
         try
         {
-            var user = await _context.Users.Include(u => u.Profile)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            //var user = await _context.Users.Include(u => u.Profile)
+            //    .FirstOrDefaultAsync(u => u.Id == userId);
+
+            var user = await _dynamoDbService.GetUserAsync(userId);
 
             if (user == null)
             {
@@ -116,8 +118,10 @@ public class ProfileService : IProfileService
 
             user.Profile.UpdatedAt = DateTime.UtcNow;
 
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
+
+            await _dynamoDbService.UpdateUserAsync(user);
+           // _context.Users.Update(user);
+            //await _context.SaveChangesAsync();
 
             var response = new UpdateProfileResponse
             {
@@ -150,8 +154,10 @@ public class ProfileService : IProfileService
     {
         try
         {
-            var user = await _context.Users.Include(u => u.Profile)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            //var user = await _context.Users.Include(u => u.Profile)
+            //    .FirstOrDefaultAsync(u => u.Id == userId);
+
+            var user = await _dynamoDbService.GetUserAsync(userId);
 
             if (user == null)
             {
@@ -170,7 +176,7 @@ public class ProfileService : IProfileService
             }
 
             await using var stream = file.OpenReadStream();
-            string ImageUrl = await _s3Service.UploadToS3Async(stream, file.FileName, file.ContentType);
+            string ImageUrl = await _s3Service.UploadToS3Async(stream, $"ProfileImage/{file.FileName}", file.ContentType);
 
             user.Profile.ProfileImageUrl = ImageUrl;
             user.Profile.UpdatedAt = DateTime.UtcNow;

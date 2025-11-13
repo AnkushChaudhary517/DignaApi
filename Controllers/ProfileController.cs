@@ -13,13 +13,15 @@ namespace DignaApi.Controllers;
 public class ProfileController : ControllerBase
 {
     private readonly IProfileService _profileService;
-    private readonly IImageService _imageService;
+    //private readonly IImageService _imageService;
+    private readonly IImageProcessingService _imageProcessingService;
 
-
-    public ProfileController(IProfileService profileService, IImageService imageService)
+    public ProfileController(IProfileService profileService, IImageService imageService, IImageProcessingService imageProcessingService)
     {
         _profileService = profileService;
-        _imageService = imageService;
+        //_imageService = imageService;
+        _imageProcessingService = imageProcessingService;
+
     }
 
     [HttpGet]
@@ -219,7 +221,16 @@ public class ProfileController : ControllerBase
     [HttpGet("stats")]
     public async Task<IActionResult> GetUserStats()
     {
-        var uploadedImages = await _imageService.GetAllImagesAsync();
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(ApiResponseHelper.Error<UploadProfilePictureResponse>(
+                "UNAUTHORIZED",
+                "User not authenticated",
+                401
+            ));
+        }
+        var uploadedImages = await _imageProcessingService.GetAllImagesAsync(userId);
         UploadData data = new UploadData();
         uploadedImages?.ForEach(i =>
         {
