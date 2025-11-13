@@ -18,5 +18,6 @@ namespace DignaApi.Services
         Task FollowUserAsync(string userId, string followeeId);
         Task LikeImageAsync(string userId, string imageId);
         Task<List<Image>> GetAllImagesForUserAsync(string userid = null);
+        Task<List<Image>> SearchImagesAsync(string query);
     }
 }

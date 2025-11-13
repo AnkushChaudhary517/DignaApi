@@ -11,10 +11,19 @@ namespace DignaApi.Services
     {
         private readonly DynamoDBContext _context;
         private readonly ILogger<DynamoDbService> _logger;
+        private readonly ICacheService _cacheService;
 
-        public DynamoDbService(IAmazonDynamoDB dynamoDb, ILogger<DynamoDbService> logger)
+        private const string UserIdCacheKey = "User_Id_{0}";
+        private const string UserEmailCacheKey = "User_Email_{0}";
+        private const string AllUsersCacheKey = "All_Users";
+        private const string SearchImageByIdCacheKey = "SearchImageById_{0}_Image";
+        private const string AllPublicImagesCacheKey = "All_Public_Images";
+        private const string PrivateImagesOfUserCacheKey = "PrivateImagesOfUserCacheKey_{0}";
+
+        public DynamoDbService(IAmazonDynamoDB dynamoDb, ILogger<DynamoDbService> logger, ICacheService cacheService)
         {
             _context = new DynamoDBContext(dynamoDb);
+            _cacheService = cacheService;
             _logger = logger;
         }
 
@@ -27,11 +36,29 @@ namespace DignaApi.Services
 
         public async Task<User?> GetUserAsync(string userId)
         {
-            return await _context.LoadAsync<User>(userId);
+            string cacheKey = string.Format(UserIdCacheKey,userId);
+            var cachedUser = _cacheService.Get<User>(cacheKey);
+            if(cachedUser != null)
+                return cachedUser;
+
+            var conditions = new List<ScanCondition>
+            {
+                new ScanCondition("Id", ScanOperator.Equal, userId)
+            };
+
+            var results = await _context.ScanAsync<User>(conditions).GetRemainingAsync();
+            var user =  results.FirstOrDefault();
+            _cacheService.Set<User>(cacheKey, user);
+            return user;
         }
 
         public async Task<User?> GetUserByEmail(string email)
         {
+            string cacheKey = string.Format(UserEmailCacheKey, email);
+            var cachedUser = _cacheService.Get<User>(cacheKey);
+            if (cachedUser != null)
+                return cachedUser;
+
             var queryConfig = new DynamoDBOperationConfig
             {
                 IndexName = "Email-index"
@@ -42,25 +69,53 @@ namespace DignaApi.Services
                 queryConfig
             ).GetRemainingAsync();
 
-            return results.FirstOrDefault();
+            var user =  results.FirstOrDefault();
+            _cacheService.Set<User>(cacheKey, user);
+            return user;
         }
 
         public async Task<List<User>> GetAllUsersAsync()
         {
+            var cachedUser = _cacheService.Get<List<User>>(AllUsersCacheKey);
+            if (cachedUser != null)
+                return cachedUser;
+
             var conditions = new List<ScanCondition>();
-            return await _context.ScanAsync<User>(conditions).GetRemainingAsync();
+            var users =  await _context.ScanAsync<User>(conditions).GetRemainingAsync();
+            _cacheService.Set<List<User>>(AllUsersCacheKey, users);
+            return users;
         }
 
         public async Task UpdateUserAsync(User user)
         {
             await _context.SaveAsync(user);
             _logger.LogInformation("User updated: {UserId}", user.Id);
+            ClearAllUserCaches(user.Id,user.Email);
         }
 
         public async Task DeleteUserAsync(string userId)
         {
             await _context.DeleteAsync<User>(userId);
             _logger.LogInformation("User deleted: {UserId}", userId);
+            ClearAllUserCaches(userId);
+        }
+
+
+        private void ClearAllUserCaches(string userId =null,string email = null)
+        {
+            //remove all user related cache
+            if(!string.IsNullOrEmpty(userId))
+            {
+                var userIdKey = string.Format(UserIdCacheKey, userId);
+                _cacheService.Remove(userIdKey);
+            }
+
+            if(!string.IsNullOrEmpty(email))
+            {
+                var userEmailKey = string.Format(UserEmailCacheKey, email);
+                _cacheService.Remove(userEmailKey);
+            }
+            _cacheService.Remove(AllUsersCacheKey);
         }
         public async Task SaveTagsAsync(Image image)
         {
@@ -84,6 +139,10 @@ namespace DignaApi.Services
         }
         public async Task<List<Image>> SearchImagesByTagAsync(string tag)
         {
+            var imageKey = $"Tag_{tag.ToLower()}_Images";
+            var cachedImages = _cacheService.Get<List<Image>>(imageKey);
+            if (cachedImages != null)
+                return cachedImages;
             // 1️⃣ Query the TagIndex
             var tagItems = await _context.QueryAsync<TagIndex>(
                 tag.ToLower(), new DynamoDBOperationConfig
@@ -104,13 +163,20 @@ namespace DignaApi.Services
                 batch.AddKey(id);
             await batch.ExecuteAsync();
 
-            return batch.Results;
+            var resutlt =  batch.Results;
+            _cacheService.Set<List<Image>>(imageKey, resutlt);
+            return resutlt;
         }
 
         public async Task<Image> SearchImageByIdAsync(string id)
         {
-
-            return await _context.LoadAsync<Image>(id);
+            var imageKey = string.Format(SearchImageByIdCacheKey,id);
+            var cachedImage = _cacheService.Get<Image>(imageKey);
+            if (cachedImage != null)
+                return cachedImage;
+            var res =  await _context.LoadAsync<Image>(id);
+            _cacheService.Set<Image>(imageKey, res);
+            return res;
         }
 
         public async Task FollowUserAsync(string userId, string followeeId)
@@ -124,6 +190,7 @@ namespace DignaApi.Services
             });
             user.Followers += 1;
             await _context.SaveAsync(user);
+            _cacheService.Update<User>(string.Format(UserIdCacheKey,userId), user);
         }
 
         public async Task LikeImageAsync(string userId, string imageId)
@@ -137,17 +204,27 @@ namespace DignaApi.Services
             });
             image.Likes += 1;
             await _context.SaveAsync(image);
+            _cacheService.Update<Image>(string.Format(SearchImageByIdCacheKey, imageId), image);
         }
 
         public async Task<List<Image>> GetAllImagesForUserAsync(string userid = null)
         {
-
-            var publicConditions = new List<ScanCondition>
+            List<Image> result = new List<Image>();
+            var cahcedPublicImages = _cacheService.Get<List<Image>>(AllPublicImagesCacheKey);
+            if(cahcedPublicImages != null && string.IsNullOrEmpty( userid))
+            {
+                result = cahcedPublicImages;
+            }
+            else
+            {
+                var publicConditions = new List<ScanCondition>
                 {
                     new ScanCondition("Visibility", ScanOperator.Equal, "public")
                 };
 
-            var result = await _context.ScanAsync<Image>(publicConditions).GetRemainingAsync();
+                result = await _context.ScanAsync<Image>(publicConditions).GetRemainingAsync();
+            }
+                
 
             if (string.IsNullOrEmpty(userid))
             {
@@ -157,22 +234,62 @@ namespace DignaApi.Services
             }
             else
             {
-                var conditions = new List<ScanCondition>
+                var privateImages = _cacheService.Get<List<Image>>(string.Format(PrivateImagesOfUserCacheKey, userid));
+                if(privateImages != null && privateImages.Count>0)
                 {
-                    //new ScanCondition("Visibility", ScanOperator.Equal, "public"),
-                    new ScanCondition("userId", ScanOperator.Equal, userid)
-                };
-
-                var privateData = await _context.ScanAsync<Image>(conditions).GetRemainingAsync();
-
-                if(privateData != null && privateData.Count>0)
-                {
-                    var unique = privateData.Where(x => result.Any(y => x.Id != y.Id)).ToList();
-                    if (unique != null && unique.Count > 0)
-                        result.AddRange(unique);
+                    result.AddRange(privateImages);
                 }
+                else
+                {
+                    var conditions = new List<ScanCondition>
+                    {
+                        //new ScanCondition("Visibility", ScanOperator.Equal, "public"),
+                        new ScanCondition("UserId", ScanOperator.Equal, userid)
+                    };
+
+                    var privateData = await _context.ScanAsync<Image>(conditions).GetRemainingAsync();
+
+                    if (privateData != null && privateData.Count > 0)
+                    {
+                        var unique = privateData.Where(x => result.Any(y => x.Id != y.Id)).ToList();
+                        if (unique != null && unique.Count > 0)
+                            result.AddRange(unique);
+                    }
+                }
+                   
                 return result;
             }
+        }
+        public async Task<List<Image>> SearchImagesAsync(string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+                return new List<Image>();
+
+            query = query.Trim().ToLowerInvariant();
+
+            var cacheKey = $"Search_Images_Query_{query}";
+            var cahcedPublicImages = _cacheService.Get<List<Image>>(cacheKey);
+            if(cahcedPublicImages != null)
+                return cahcedPublicImages;
+
+            var conditions = new List<ScanCondition>();
+
+            // We'll fetch all items, then filter manually (since DynamoDB doesn't support full text search)
+            var allImages = await _context.ScanAsync<Image>(conditions).GetRemainingAsync();
+
+            // Perform client-side filtering (case-insensitive partial match)
+           var results = allImages
+                .Where(img =>
+                    (!string.IsNullOrEmpty(img.Title) && img.Title.ToLower().Contains(query)) ||
+                    (!string.IsNullOrEmpty(img.Description) && img.Description.ToLower().Contains(query)) ||
+                    (img.Tags != null && img.Tags.Any(tag => tag.ToLower().Contains(query)))
+                )
+                .OrderByDescending(img => img.CreatedAt)
+                .Take(50) // optional: limit results
+                .ToList();
+
+            _cacheService.Set<List<Image>>(cacheKey, results);
+            return results;
         }
     }
 }

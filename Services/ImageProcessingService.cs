@@ -108,6 +108,11 @@
             return  _dynamoDbService.GetAllImagesForUserAsync(userid);
             
         }
+
+        public Task<List<Entities.DynamoEntitites.Image>> SearchImagesAsync(string q)
+        {
+            return _dynamoDbService.SearchImagesAsync(q);
+        }
     }
 
 }

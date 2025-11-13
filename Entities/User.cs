@@ -7,8 +7,8 @@ public class User
 {
     [DynamoDBHashKey]
     public string Id { get; set; } = Guid.NewGuid().ToString();
-    //[DynamoDBRangeKey] // Sort key
-    [DynamoDBProperty]
+    [DynamoDBRangeKey] // Sort key
+    //[DynamoDBProperty]
     public string Email { get; set; }
     [DynamoDBProperty]
     public string FirstName { get; set; } = string.Empty;

@@ -79,6 +79,8 @@ public class Startup
             };
         });
 
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService,InMemoryCache>();
         services.AddDefaultAWSOptions(Configuration.GetAWSOptions());
         // Register DynamoDB client for DI
         services.AddAWSService<IAmazonDynamoDB>();

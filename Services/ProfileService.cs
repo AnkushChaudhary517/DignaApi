@@ -69,8 +69,10 @@ public class ProfileService : IProfileService
     {
         try
         {
-            var user = await _context.Users.Include(u => u.Profile)
-                .FirstOrDefaultAsync(u => u.Id == userId);
+            //var user = await _context.Users.Include(u => u.Profile)
+            //    .FirstOrDefaultAsync(u => u.Id == userId);
+
+            var user = await _dynamoDbService.GetUserAsync(userId);
 
             if (user == null)
             {
@@ -181,8 +183,9 @@ public class ProfileService : IProfileService
             user.Profile.ProfileImageUrl = ImageUrl;
             user.Profile.UpdatedAt = DateTime.UtcNow;
 
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
+            await _dynamoDbService.UpdateUserAsync(user);
+            //_context.Users.Update(user);
+            //await _context.SaveChangesAsync();
 
             var response = new UploadProfilePictureResponse
             {

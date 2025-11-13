@@ -20,6 +20,62 @@ public class ImageController : ControllerBase
         _s3Service = s3Service;
         _imageProcessingService = imageProcessingService;
     }
+    [HttpGet("images/search/{q}")]
+    public async Task<IActionResult> SearchImages( string q)
+    {
+        if(string.IsNullOrEmpty(q) || q.ToLower()=="undefined")
+        {
+            //var images = await _imageService.GetAllImagesAsync();
+            var images = await _imageProcessingService.GetAllImagesAsync();
+            var res2 = images?.ConvertAll(i => new ImageListResponse
+            {
+                Id = i.Id,
+                Title = i.Title,
+                ImageUrl = i.ImageUrl,
+                Photographer = i.Photographer,
+                AspectRatio = i.AspectRatio,
+                DownloadCount = i.Downloads,
+                Qualityurls = i.QualityUrls != null ? i.QualityUrls.Values.ToList() : new List<string>(),
+                DownloadSizes = i.QualityUrls.Select(d => new DownloadSizeResponse
+                {
+                    Name = d.Key,
+                    Url = d.Value
+                }).ToList()
+
+            });
+
+            return Ok(new ApiResponse<List<ImageListResponse>>
+            {
+                Success = true,
+                Data = res2,
+                Message = "Images retrieved successfully"
+            });
+        }
+        var results = await _imageProcessingService.SearchImagesAsync(q);
+        var res = results?.ConvertAll(i => new ImageListResponse
+        {
+            Id = i.Id,
+            Title = i.Title,
+            ImageUrl = i.ImageUrl,
+            Photographer = i.Photographer,
+            AspectRatio = i.AspectRatio,
+            DownloadCount = i.Downloads,
+            Qualityurls = i.QualityUrls != null ? i.QualityUrls.Values.ToList() : new List<string>(),
+            DownloadSizes = i.QualityUrls.Select(d => new DownloadSizeResponse
+            {
+                Name = d.Key,
+                Url = d.Value
+            }).ToList()
+
+        });
+
+        return Ok(new ApiResponse<List<ImageListResponse>>
+        {
+            Success = true,
+            Data = res,
+            Message = "Images retrieved successfully"
+        });
+    }
 
     [HttpGet("images")]
     public async Task<ActionResult<ApiResponse<List<ImageListResponse>>>> GetAllImages()
