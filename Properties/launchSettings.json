@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "DignaApi": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:57309;http://localhost:57310"
+    }
+  }
+}
