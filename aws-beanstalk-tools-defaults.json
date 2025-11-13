@@ -1,0 +1,19 @@
+{
+  "region": "ap-south-1",
+  "configuration": "Debug",
+  "framework": "net8.0",
+  "self-contained": true,
+  "application": "DignaApi",
+  "environment": "DignaApi-dev",
+  "enable-xray": false,
+  "enhanced-health-type": "basic",
+  "additional-options": "\u0022aws:autoscaling:launchconfiguration,SecurityGroups\u0022=\u0022sg-036ba238c31ea127a\u0022;\u0022aws:ec2:vpc,Subnets\u0022=\u0022subnet-02c5670eefeed2562\u0022",
+  "proxy-server": "nginx",
+  "solution-stack": "64bit Amazon Linux 2 v2.11.7 running .NET Core",
+  "environment-type": "SingleInstance",
+  "cname": "dignaapi-dev",
+  "instance-type": "t3a.micro",
+  "key-pair": "",
+  "instance-profile": "aws-elasticbeanstalk-ec2-role",
+  "service-role": "aws-elasticbeanstalk-service-role"
+}
