@@ -21,6 +21,7 @@ namespace DignaApi.Services
         private const string AllPublicImagesCacheKey = "All_Public_Images";
         private const string PrivateImagesOfUserCacheKey = "PrivateImagesOfUserCacheKey_{0}";
         private const string SearchImagesByTagCacheKey = "SearchImagesByTag _ {0}";
+        private const string SearchLikedImagesByUserIdCacheKey = "Search_Liked_Images_UserId_{0}";
 
         public DynamoDbService(IAmazonDynamoDB dynamoDb, ILogger<DynamoDbService> logger, ICacheService cacheService)
         {
@@ -120,9 +121,19 @@ namespace DignaApi.Services
             _cacheService.Remove(AllUsersCacheKey);
         }
 
-        private void ClearAllImageCaches()
+        private void ClearAllImageCaches(string userId = null, string imageId = null)
         {
             _cacheService.Remove(AllPublicImagesCacheKey);
+            if(!string.IsNullOrEmpty(userId))
+            {
+                var likedImages = string.Format(SearchLikedImagesByUserIdCacheKey, userId);
+                _cacheService.Remove(likedImages);
+            }
+            if(!string.IsNullOrEmpty(imageId))
+            {
+                var imageKey = string.Format(SearchImageByIdCacheKey, imageId);
+                _cacheService.Remove(imageKey);
+            }
         }
         public async Task SaveTagsAsync(Image image)
         {
@@ -232,7 +243,7 @@ namespace DignaApi.Services
             _cacheService.Update<Image>(string.Format(SearchImageByIdCacheKey, imageId), image);
 
             //cclear other image cache
-
+            ClearAllImageCaches(userId);
         }
 
         public async Task<List<Image>> GetAllImagesForUserAsync(string userid = null)
@@ -348,7 +359,7 @@ namespace DignaApi.Services
             if (string.IsNullOrWhiteSpace(userId))
                 return new List<Image>();
 
-            var cacheKey = $"Search_Liked_Images_UserId_{userId}";
+            var cacheKey = string.Format(SearchLikedImagesByUserIdCacheKey,userId);
             var cahcedPublicImages = _cacheService.Get<List<Image>>(cacheKey);
             if (cahcedPublicImages != null)
                 return cahcedPublicImages;
