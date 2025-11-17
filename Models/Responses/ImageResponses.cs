@@ -3,11 +3,13 @@
 public class ImageListResponse
 {
     public string Id { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
     public string Photographer { get; set; } = string.Empty;
     public string AspectRatio { get; set; } = "square";
     public int DownloadCount { get; set; }
+    public bool Liked { get; set; }
     public List<string> Qualityurls { get; set; } = new();
     public List<DownloadSizeResponse> DownloadSizes { get; set; } = new List<DownloadSizeResponse>();
 }

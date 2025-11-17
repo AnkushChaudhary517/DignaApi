@@ -2,6 +2,7 @@
 {
     using Amazon.S3;
     using Amazon.S3.Transfer;
+    using DignaApi.Entities;
     using DignaApi.Models.Responses;
     using SixLabors.ImageSharp;
     using SixLabors.ImageSharp.Processing;
@@ -112,6 +113,15 @@
         public Task<List<Entities.DynamoEntitites.Image>> SearchImagesAsync(string q)
         {
             return _dynamoDbService.SearchImagesAsync(q);
+        }
+
+        public Task<List<Entities.DynamoEntitites.Image>> GetImagesByUserid(string userId)
+        {
+            return _dynamoDbService.GetImagesByUserid(userId);
+        }
+        public Task<List<Entities.DynamoEntitites.Image>> GetImagesLikedByuserAsync(string userId)
+        {
+            return _dynamoDbService.GetImagesLikedByuserAsync(userId);
         }
     }
 

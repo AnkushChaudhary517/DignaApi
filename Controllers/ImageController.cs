@@ -23,25 +23,46 @@ public class ImageController : ControllerBase
     [HttpGet("images/search/{q}")]
     public async Task<IActionResult> SearchImages( string q)
     {
-        if(string.IsNullOrEmpty(q) || q.ToLower()=="undefined")
+        var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        List<Entities.DynamoEntitites.Image> likedImages =null;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            likedImages = await _imageProcessingService.GetImagesLikedByuserAsync(userId);
+            //get all images for user including private
+        }
+
+        List<ImageListResponse> res2 = new List<ImageListResponse>();
+
+        if (string.IsNullOrEmpty(q) || q.ToLower()=="undefined")
         {
             //var images = await _imageService.GetAllImagesAsync();
             var images = await _imageProcessingService.GetAllImagesAsync();
-            var res2 = images?.ConvertAll(i => new ImageListResponse
+            
+            images?.ForEach(i =>
             {
-                Id = i.Id,
-                Title = i.Title,
-                ImageUrl = i.ImageUrl,
-                Photographer = i.Photographer,
-                AspectRatio = i.AspectRatio,
-                DownloadCount = i.Downloads,
-                Qualityurls = i.QualityUrls != null ? i.QualityUrls.Values.ToList() : new List<string>(),
-                DownloadSizes = i.QualityUrls.Select(d => new DownloadSizeResponse
+                var liked = false;
+                if (likedImages != null && likedImages.Any(x => x.Id == i.Id))
                 {
-                    Name = d.Key,
-                    Url = d.Value
-                }).ToList()
+                    liked = true;
+                }
+                res2.Add(new ImageListResponse
+                {
+                    Id = i.Id,
+                    UserId = i.UserId,
+                    Title = i.Title,
+                    ImageUrl = i.ImageUrl,
+                    Photographer = i.Photographer,
+                    AspectRatio = i.AspectRatio,
+                    DownloadCount = i.Downloads,
+                    Liked = liked,
+                    Qualityurls = i.QualityUrls != null ? i.QualityUrls.Values.ToList() : new List<string>(),
+                    DownloadSizes = i.QualityUrls.Select(d => new DownloadSizeResponse
+                    {
+                        Name = d.Key,
+                        Url = d.Value
+                    }).ToList()
 
+                });
             });
 
             return Ok(new ApiResponse<List<ImageListResponse>>
@@ -290,6 +311,7 @@ public class ImageController : ControllerBase
             return BadRequest("Meta information missing or does not match file count.");
 
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userName = User.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
         var uploadResults = new List<UploadImageRequest>();
 
         for (int i = 0; i < files.Count; i++)
@@ -303,7 +325,7 @@ public class ImageController : ControllerBase
             {
                 Title = file.FileName,
                 Description = metadata.Description,
-                Photographer = metadata.Photographer,
+                Photographer = metadata.Photographer?? userName,
                 Tags = metadata.Tags?.Split(',')?.ToList(),
                 Visibility = "public",
                 UserId = userId!,

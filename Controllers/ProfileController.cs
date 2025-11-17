@@ -25,9 +25,15 @@ public class ProfileController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<ProfileResponse>>> GetProfile()
+    [Route("{id}")]
+    public async Task<ActionResult<ApiResponse<ProfileResponse>>> GetProfile(string id)
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if(!string.IsNullOrEmpty(id) && id.ToLower() != "undefined")
+        {
+            userId = id;
+        }
         if (string.IsNullOrEmpty(userId))
         {
             return Unauthorized(ApiResponseHelper.Error<ProfileResponse>(
@@ -218,10 +224,20 @@ public class ProfileController : ControllerBase
 
         return Ok(ApiResponseHelper.Success(response, "Profile picture uploaded successfully"));
     }
-    [HttpGet("stats")]
-    public async Task<IActionResult> GetUserStats()
+    [HttpGet("stats/{id}")]
+    public async Task<IActionResult> GetUserStats(string id)
     {
         var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        List<Entities.DynamoEntitites.Image> likedImages = null;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            likedImages = await _imageProcessingService.GetImagesLikedByuserAsync(userId);
+            //get all images for user including private
+        }
+        if (!string.IsNullOrEmpty(id) && id.ToLower() != "undefined")
+        {
+           userId = id;
+        }
         if (string.IsNullOrEmpty(userId))
         {
             return Unauthorized(ApiResponseHelper.Error<UploadProfilePictureResponse>(
@@ -230,15 +246,20 @@ public class ProfileController : ControllerBase
                 401
             ));
         }
-        var uploadedImages = await _imageProcessingService.GetAllImagesAsync(userId);
+        var uploadedImages = await _imageProcessingService.GetImagesByUserid(userId);
         UploadData data = new UploadData();
         uploadedImages?.ForEach(i =>
         {
+            var liked = false;
+            if (likedImages != null && likedImages.Any(x => x.Id == i.Id))
+                liked = true;
             data.Items.Add(new UploadItem()
             {
                 Id = i.Id,
                 ImageUrl = i.ImageUrl,
-                Title = i.Title
+                Title = i.Title,
+                Liked = liked,
+
             });
         });
         data.Count = uploadedImages.Count;

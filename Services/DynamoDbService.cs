@@ -4,6 +4,7 @@ using Amazon.DynamoDBv2.DocumentModel;
 using DignaApi.Entities;
 using DignaApi.Entities.DynamoEntitites;
 using DignaApi.Models.Responses;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace DignaApi.Services
 {
@@ -19,6 +20,7 @@ namespace DignaApi.Services
         private const string SearchImageByIdCacheKey = "SearchImageById_{0}_Image";
         private const string AllPublicImagesCacheKey = "All_Public_Images";
         private const string PrivateImagesOfUserCacheKey = "PrivateImagesOfUserCacheKey_{0}";
+        private const string SearchImagesByTagCacheKey = "SearchImagesByTag _ {0}";
 
         public DynamoDbService(IAmazonDynamoDB dynamoDb, ILogger<DynamoDbService> logger, ICacheService cacheService)
         {
@@ -117,6 +119,11 @@ namespace DignaApi.Services
             }
             _cacheService.Remove(AllUsersCacheKey);
         }
+
+        private void ClearAllImageCaches()
+        {
+            _cacheService.Remove(AllPublicImagesCacheKey);
+        }
         public async Task SaveTagsAsync(Image image)
         {
             await _context.SaveAsync(image);
@@ -139,7 +146,7 @@ namespace DignaApi.Services
         }
         public async Task<List<Image>> SearchImagesByTagAsync(string tag)
         {
-            var imageKey = $"Tag_{tag.ToLower()}_Images";
+            var imageKey = string.Format(SearchImagesByTagCacheKey, tag);
             var cachedImages = _cacheService.Get<List<Image>>(imageKey);
             if (cachedImages != null)
                 return cachedImages;
@@ -195,16 +202,37 @@ namespace DignaApi.Services
 
         public async Task LikeImageAsync(string userId, string imageId)
         {
-            var image = await _context.LoadAsync<Image> (userId, imageId);
-             await _context.SaveAsync(new Like()
+            
+            var likedList = await GetImagesLikedByuserAsync(userId);
+            Image image = null;
+            if(likedList.Any(x => x.Id == imageId))
             {
-                ImageId = imageId,
-                UserId = userId,
-                LikedAt = DateTime.UtcNow
-            });
-            image.Likes += 1;
+                image = likedList.FirstOrDefault(x => x.Id == imageId);
+                await _context.DeleteAsync<Like>(new Like()
+                {
+                    ImageId = imageId,
+                    UserId = userId,
+                    LikedAt = DateTime.UtcNow
+                });
+                image.Likes -= 1;
+            }
+            else
+            {
+                image = await _context.LoadAsync<Image>(imageId);
+                await _context.SaveAsync(new Like()
+                {
+                    ImageId = imageId,
+                    UserId = userId,
+                    LikedAt = DateTime.UtcNow
+                });
+                image.Likes += 1;
+            }
+
             await _context.SaveAsync(image);
             _cacheService.Update<Image>(string.Format(SearchImageByIdCacheKey, imageId), image);
+
+            //cclear other image cache
+
         }
 
         public async Task<List<Image>> GetAllImagesForUserAsync(string userid = null)
@@ -290,6 +318,61 @@ namespace DignaApi.Services
 
             _cacheService.Set<List<Image>>(cacheKey, results);
             return results;
+        }
+
+        public async Task<List<Image>> GetImagesByUserid(string userid)
+        {
+            if (string.IsNullOrWhiteSpace(userid))
+                return new List<Image>();
+
+            var cacheKey = $"Search_Images_UserId_{userid}";
+            var cahcedPublicImages = _cacheService.Get<List<Image>>(cacheKey);
+            if (cahcedPublicImages != null)
+                return cahcedPublicImages;
+
+            var conditions = new List<ScanCondition>()
+            {
+                 new ScanCondition("UserId", ScanOperator.Equal, userid)
+            };
+
+            // We'll fetch all items, then filter manually (since DynamoDB doesn't support full text search)
+            var allImages = await _context.ScanAsync<Image>(conditions).GetRemainingAsync();
+
+            if(allImages != null && allImages.Count > 0)
+              _cacheService.Set<List<Image>>(cacheKey, allImages);
+            return allImages;
+        }
+
+        public async Task<List<Image>> GetImagesLikedByuserAsync(string userId)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+                return new List<Image>();
+
+            var cacheKey = $"Search_Liked_Images_UserId_{userId}";
+            var cahcedPublicImages = _cacheService.Get<List<Image>>(cacheKey);
+            if (cahcedPublicImages != null)
+                return cahcedPublicImages;
+
+            var allImages =  await _context.QueryAsync<Like>(
+                userId, new DynamoDBOperationConfig
+                {
+                    IndexName = "UserId-index"
+                }
+            ).GetRemainingAsync().ContinueWith(async likesTask =>
+            {
+                var likes = likesTask.Result;
+                var batch = _context.CreateBatchGet<Image>();
+                foreach (var like in likes)
+                {
+                    batch.AddKey(like.ImageId);
+                }
+                await batch.ExecuteAsync();
+                return batch.Results;
+            }).Unwrap();
+
+            if (allImages != null && allImages.Count > 0)
+                _cacheService.Set<List<Image>>(cacheKey, allImages);
+            return allImages;
         }
     }
 }

@@ -13,5 +13,7 @@ namespace DignaApi.Services
         Task LikeImageAsync(string userId, string id);
         Task<List<DignaApi.Entities.DynamoEntitites.Image>> GetAllImagesAsync(string userid = null);
         Task<List<DignaApi.Entities.DynamoEntitites.Image>> SearchImagesAsync(string q);
+        Task<List<DignaApi.Entities.DynamoEntitites.Image>> GetImagesByUserid(string userId);
+        Task<List<Entities.DynamoEntitites.Image>> GetImagesLikedByuserAsync(string userId);
     }
 }
