@@ -282,7 +282,7 @@ public class AuthController : ControllerBase
 
         var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
         var tokenData = JsonSerializer.Deserialize<JsonElement>(tokenJson);
-
+        Console.WriteLine(tokenData.ToString());
         var idToken = tokenData.GetProperty("id_token").GetString();
 
         // OPTIONAL: Validate ID token (recommended)
