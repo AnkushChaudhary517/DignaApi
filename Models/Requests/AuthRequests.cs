@@ -14,6 +14,12 @@ public class RegisterRequest
     public bool AcceptTerms { get; set; } = true;
 }
 
+public class GoogleLoginRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+}
+
 public class SocialLoginRequest
 {
     public string Provider { get; set; } = string.Empty; // google, facebook, apple

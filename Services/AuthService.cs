@@ -19,7 +19,36 @@ public class AuthService : IAuthService
         _dynamoDbService = dynamoDbService;
 
     }
+    public async Task<LoginResponse> GoogleLoginAsync(GoogleLoginRequest googleLoginRequest)
+    {
+        var user = await _dynamoDbService.GetUserByEmail(googleLoginRequest.Email);
+        if(user == null)
+        {
+            await RegisterAsync(new RegisterRequest()
+            {
+                Email = googleLoginRequest.Email,
+                Name = googleLoginRequest.Name,
+                Password = Guid.NewGuid().ToString(),
+                AcceptTerms = true
+            });
+            user = await _dynamoDbService.GetUserByEmail(googleLoginRequest.Email);
+        }
+        var token = _tokenService.GenerateAccessToken(user);
+        var refreshToken = _tokenService.GenerateRefreshToken();
 
+        var response = new LoginResponse
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            ProfileImage = user.Profile?.ProfileImageUrl ?? "",
+            Token = token,
+            RefreshToken = refreshToken,
+            ExpiresIn = 3600
+        };
+        return response;
+    }
     public async Task<(bool success, LoginResponse? response, string? error)> LoginAsync(LoginRequest request)
     {
         try
@@ -375,4 +404,5 @@ public class AuthService : IAuthService
             return (false, null, ex.Message);
         }
     }
+
 }

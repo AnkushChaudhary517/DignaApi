@@ -26,6 +26,7 @@ public class Startup
 
     public void ConfigureServices(IServiceCollection services)
     {
+        services.AddHttpClient();
         // MVC
         services.AddControllers();
 
