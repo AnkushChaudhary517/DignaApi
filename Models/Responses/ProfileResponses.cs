@@ -2,6 +2,8 @@ namespace DignaApi.Models.Responses;
 
 public class ProfileResponse
 {
+    public bool isFollowing { get; set; } = false;
+
     public string UserId { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
@@ -18,6 +20,7 @@ public class ProfileResponse
     public string? Youtube { get; internal set; }
     public string? Pinterest { get; internal set; }
     public string? ProfileImageUrl { get; internal set; }
+    public int Uploads { get; set; }
 }
 
 public class SocialLinksResponse

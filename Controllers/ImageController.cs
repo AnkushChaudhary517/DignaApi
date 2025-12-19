@@ -3,6 +3,7 @@ using DignaApi.Models.Responses;
 using DignaApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DignaApi.Controllers;
 
@@ -431,6 +432,39 @@ public class ImageController : ControllerBase
                     StatusCode = 500
                 }
             });
+        }
+    }
+    [HttpPost("image/{id}/track-download")]
+    public async Task<IActionResult> TrackDownload(string id, [FromBody] TrackDownloadRequest request)
+    {
+        if (string.IsNullOrEmpty(id))
+            return BadRequest(new { success = false, error = new { message = "image id is required" } });
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                     ?? User.FindFirst("userId")?.Value
+                     ?? User.FindFirst("sub")?.Value;
+
+        var userAgent = Request.Headers["User-Agent"].FirstOrDefault();
+        var referer = Request.Headers["Referer"].FirstOrDefault();
+
+        try
+        {
+            var ev = await _imageProcessingService.TrackDownloadAsync(id, userId, request, userAgent, referer);
+            return Ok(new
+            {
+                success = true,
+                data = new
+                {
+                    id = ev.Id,
+                    imageId = ev.ImageId,
+                    userId = ev.UserId,
+                    createdAt = ev.CreatedAt
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, error = new { message = ex.Message } });
         }
     }
 }
