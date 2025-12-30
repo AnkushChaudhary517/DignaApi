@@ -82,6 +82,9 @@
                     InputStream = ms,
                     Key = img.Title,
                     BucketName = _bucketName,
+                    ContentType = "image/jpeg",
+                    //ContentDisposition = "inline",
+                    CannedACL = S3CannedACL.PublicRead
                     //ContentType = contentType,
                     //CannedACL = S3CannedACL.PublicRead // make public if required
                 };
