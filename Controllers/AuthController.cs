@@ -262,7 +262,7 @@ public class AuthController : ControllerBase
     // STEP 2: Google callback
     [HttpGet("callback")]
     public async Task<IActionResult> GoogleCallback(
-        [FromQuery] string token,
+        [FromQuery] string code,
         [FromQuery] string state)
     {
         var client = _httpClientFactory.CreateClient();
@@ -272,7 +272,7 @@ public class AuthController : ControllerBase
             "https://oauth2.googleapis.com/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
-                { "code", token },
+                { "code", code },
                 { "client_id", _config["GoogleAuth:ClientId"] },
                 { "client_secret", _config["GoogleAuth:ClientSecret"] },
                 { "redirect_uri", GetCallbackUrl() },
